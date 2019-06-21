@@ -50,7 +50,7 @@ class OmniPathThread(object):
         return threading.Thread(name='sync', target=self.run_sync)
 
     def start(self):
-        LOG.debug("Starting a new omnipath sync thread")
+        LOG.debug("OMNIPATH/THREAD Starting a new omnipath sync thread")
         if self._omni_sync_thread_stop.is_set():
             self._omni_sync_thread_stop.clear()
             self._omni_sync_thread = self._create_omni_sync_thread()
@@ -59,7 +59,7 @@ class OmniPathThread(object):
             self._omni_sync_thread.start()
 
     def stop(self, timeout=None):
-        LOG.debug("Stopping the omnipath sync thread")
+        LOG.debug("OMNIPATH/THREAD Stopping the omnipath sync thread")
         if self._omni_sync_thread.is_alive():
             self._omni_sync_thread_stop.set()
             self.set_sync_event()
@@ -72,22 +72,26 @@ class OmniPathThread(object):
     def run_sync(self):
         while not self._omni_sync_thread_stop.is_set():
             try:
+                LOG.debug("OMNIPATH/THREAD run_sync() cycle")
                 self.event.wait()
                 self.event.clear()
                 self.sync_omnipath_operations()
             except Exception:
-                LOG.exception("Error on running omnipath sync run_sync")
+                LOG.exception("OMNIPATH/THREAD Error on running omnipath "
+                              "sync run_sync")
 
     def _commit_and_reload(self):
         try:
+             LOG.debug("OMNIPATH/THREAD opafmvf commit+reload")
             self.fabric_cli.osfa_management_commands("commit")
             self.fabric_cli.osfa_management_commands("reload")
         except Exception:
-            LOG.exception("Error on omnipath sync check if fabric is up")
+            LOG.exception("OMNIPATH/THREAD Error on omnipath sync check if "
+                          "fabric is up")
             raise omp_exc.FabricAgentCLIError
 
     def sync_omnipath_operations(self):
-        LOG.debug("Started syncing with omnipath fabric")
+        LOG.debug("OMNIPATH/THREAD Started syncing with omnipath fabric")
         try:
             context = nl_context.get_admin_context()
             all_pending_entries = opadbapi.get_all_entries_by_state(
@@ -99,16 +103,19 @@ class OmniPathThread(object):
                     try:
                         self._process_entry(context, entry)
                     except Exception:
-                        LOG.exception("Error on syncing omnipath entry")
+                        LOG.error("OMNIPATH/THREAD Error on syncing "
+                                      "omnipath entry")
             if all_waiting_ports:
                 updated_ports = self._process_port_batch(
                     context, all_waiting_ports)
                 if updated_ports > 0:
                     self._commit_and_reload()
         except Exception:
-            LOG.exception("Error on omnipath sync check if fabric is up")
+            LOG.error("OMNIPATH/THREAD Error on omnipath sync check if "
+                          "fabric is up")
 
     def _prepare_ports_batch(self, all_waiting_ports):
+        LOG.debug("OMNIPATH/THREAD _prepare_ports_batch()")
         port_add_batch = {}
         port_del_batch = {}
         for port in all_waiting_ports:
@@ -143,6 +150,7 @@ class OmniPathThread(object):
             opadbapi.update_multiple_rows(context, "completed",
                                           port_bind_ids)
 
+        LOG.debug("OMNIPATH/THREAD all_waiting_ports=%s" % all_waiting_ports)
         for network in port_del_batch.keys():
             port_args = [x[0] for x in port_del_batch[network]]
             port_guids = " ".join(port_args)
@@ -155,6 +163,7 @@ class OmniPathThread(object):
         return len(port_bind_ids) + len(port_del_ids)
 
     def _process_entry(self, context, entry):
+        LOG.debug("OMNIPATH/THREAD _process_entry()")
         data = entry.get('data')
         if entry.get('resource_type') == "network":
             net_id = data['id']
@@ -172,5 +181,6 @@ class OmniPathThread(object):
         elif entry.get('resource_type') == 'port':
             net_id = data['network_id']
             port_guid = data['port_guid']
+            LOG.debug("OMNIPATH/THREAD adding port guid from pending state: %s" % port_guid)
             self.fabric_cli.osfa_config_commands(
                 "add", net_id, port_guid)

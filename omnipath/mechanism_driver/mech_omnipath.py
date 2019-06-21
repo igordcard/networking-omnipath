@@ -37,6 +37,7 @@ sync_time = 10
 
 class OmnipathMechanismDriver(api.MechanismDriver):
     def initialize(self):
+        LOG.debug("OMNIPATH initializing omnipath...")
         self.opafmvf = fabric_agent.FabricAgentClient()
         # Runs sync() every "sync_time" seconds
         self.omnipath_thread = ojournal.OmniPathThread(
@@ -58,6 +59,7 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         :param status: Status of the port
         :return: Updated Port Object
         """
+        LOG.debug("OMNIPATH update_port_status_db...")
         ctx = context.get_admin_context()
         return ports.Port.update_object(
             ctx, {'status': status}, port_id=port_id)
@@ -70,6 +72,8 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         :param port: The port to check
         :returns: Whether the port is supported by the NGS driver
         """
+        LOG.debug("OMNIPATH _is_port_supported(%s), result %s..." % (
+            vnic_type, (vnic_type == portbindings.VNIC_BAREMETAL)))
         vnic_type = port[portbindings.VNIC_TYPE]
         return vnic_type == portbindings.VNIC_BAREMETAL
 
@@ -85,6 +89,7 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         of the current transaction.
         """
         # (manjeets) add the revision number logic here.
+        LOG.debug("OMNIPATH create_network_precommit...")
         net = context.current
         res_id = net['id']
         res_type = "network"
@@ -284,18 +289,22 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         cannot block.  Raising an exception will result in a rollback
         of the current transaction.
         """
+        LOG.debug("OMNIPATH create_port_precommit...")
         port = context.current
         port['operation'] = op_const.OPA_CREATE
         port['op_type'] = "config"
         profile = context.current.get(portbindings.PROFILE)
+        LOG.debug("OMNIPATH port id %s has profile %s" % (port['id'], profile))
         node_guid = profile.get('guid')
         if not node_guid:
             # port doesn't belong to this backend
             return
+        LOG.debug("OMNIPATH port id %s has with node_guid %s" % (port['id'], node_guid))
         port['guid'] = node_guid
         opadbapi.record_pending_entry(context._plugin_context,
                                       port['id'], "port", port,
                                       state='waiting')
+        LOG.debug("OMNIPATH added record for port id %s with state 'waiting'" % port['id'])
 
     def create_port_postcommit(self, context):
         """Create a port.
@@ -361,6 +370,7 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         are not expected, but raising an exception will result in
         rollback of the transaction.
         """
+        LOG.debug("OMNIPATH delete_port_precommit ...")
         port = context.current
         port_row = opadbapi.get_resource_row(
             context._plugin_context, port['id'], "port")
@@ -432,6 +442,7 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         can use with ports.
         """
         port_data = context.current
+        LOG.debug("OMNIPATH bind_port(%s) ..." % port_data['id'])
         port = opadbapi.get_resource_row(context._plugin_context,
                                          port_data['id'], "port")
         portdict = port.get("data") if port else None
@@ -443,13 +454,14 @@ class OmnipathMechanismDriver(api.MechanismDriver):
         port.data = port_data
         context._plugin_context.session.merge(port)
         net_id = context.network.current['id']
-        LOG.debug("Attempting to bind port %(port)s on "
+        LOG.debug("OMNIPATH Attempting to bind port %(port)s on "
                   "network %(network)s",
                   {'port': context.current['id'],
                    'network': net_id})
         segment = context.segments_to_bind[0]
+        LOG.debug("OMNIPATH segment %s" % segment)
         if not segment:
-            LOG.debug("Port Binding error no valid segments to bind")
+            LOG.error("OMNIPATH Port Binding error no valid segments to bind")
             return
         context.set_binding(segment[api.ID], "PKEY", {}, status='ACTIVE')
         provisioning_blocks.provisioning_complete(

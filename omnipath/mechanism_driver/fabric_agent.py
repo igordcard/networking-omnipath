@@ -58,8 +58,9 @@ class FabricAgentCLI(object):
         self.connect()
         exec_engine = self.client.get_transport().open_session()
         exec_engine.exec_command(command)
-        LOG.debug("Command dispatched %s", command)
+        LOG.debug("OMNIPATH Command dispatched %s", command)
         exec_status = exec_engine.recv_exit_status()
+        LOG.debug("OMNIPATH Command exit status %s", exec_status)
         self.client.close()
         return exec_status
 
@@ -85,6 +86,7 @@ class FabricAgentCLI(object):
             else:
                 raise omnipath_exceptions.FabricAgentUnknownCommandError
             final_cmd = self._prepare_command(cmd)
+            LOG.debug("OMNIPATH command %s" % final_cmd)
             return self.execute_command(final_cmd)
         except omnipath_exceptions.FabricAgentUnknownCommandError:
             LOG.error(command + " not supported in opafmvf CLI")
@@ -102,6 +104,7 @@ class FabricAgentCLI(object):
             else:
                 raise omnipath_exceptions.FabricAgentUnknownCommandError
             final_cmd = self._prepare_command(cmd)
+            LOG.debug("OMNIPATH command %s" % final_cmd)
             return self.execute_command(final_cmd)
         except omnipath_exceptions.FabricAgentUnknownCommandError:
             LOG.error(command + " not supported in opafmvf CLI")
@@ -121,6 +124,7 @@ class FabricAgentCLI(object):
             else:
                 raise omnipath_exceptions.FabricAgentUnknownCommandError
             final_cmd = self._prepare_command(cmd)
+            LOG.debug("OMNIPATH command %s" % final_cmd)
             return self.execute_command(final_cmd)
         except omnipath_exceptions.FabricAgentUnknownCommandError:
             LOG.error(command + " not supported in opafmvf CLI")
